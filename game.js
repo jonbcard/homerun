@@ -10,11 +10,16 @@ class BaseballGame {
         this.mouse = { x: 0, y: 0 };
         this.ballInPlay = false;
         this.score = 0;
+        this.strikes = 0; // Track strike count
+        this.gameOver = false; // Track if game is over
         this.ballSpeed = 60;
         this.ballTimer = Date.now() + 500; // First ball in 0.5 seconds
         this.ballInterval = 3000; // 3 seconds between balls
         this.currentPitch = null;
         this.pitchTypes = ['fastball', 'slider', 'changeup'];
+        
+        // Initialize speech synthesis
+        this.synth = window.speechSynthesis;
         
         this.init();
         this.createField();
@@ -123,67 +128,138 @@ class BaseballGame {
     createBat() {
         const batGroup = new THREE.Group();
         
+        // Create realistic wood grain texture for handle
+        const handleCanvas = document.createElement('canvas');
+        handleCanvas.width = 64;
+        handleCanvas.height = 256;
+        const handleCtx = handleCanvas.getContext('2d');
+        
+        // Base wood color (darker for handle)
+        handleCtx.fillStyle = '#8B4513';
+        handleCtx.fillRect(0, 0, 64, 256);
+        
+        // Add wood grain lines
+        for (let i = 0; i < 20; i++) {
+            const y = (i / 20) * 256;
+            const variance = Math.sin(i * 0.5) * 8;
+            handleCtx.strokeStyle = `rgba(139, 69, 19, ${0.3 + Math.random() * 0.4})`;
+            handleCtx.lineWidth = 1 + Math.random() * 2;
+            handleCtx.beginPath();
+            handleCtx.moveTo(0, y);
+            handleCtx.quadraticCurveTo(32 + variance, y + 5, 64, y);
+            handleCtx.stroke();
+        }
+        
+        // Add darker grain details
+        for (let i = 0; i < 15; i++) {
+            const y = Math.random() * 256;
+            handleCtx.strokeStyle = `rgba(101, 67, 33, ${0.5 + Math.random() * 0.3})`;
+            handleCtx.lineWidth = 0.5 + Math.random();
+            handleCtx.beginPath();
+            handleCtx.moveTo(0, y);
+            handleCtx.lineTo(64, y + (Math.random() - 0.5) * 4);
+            handleCtx.stroke();
+        }
+        
+        const handleTexture = new THREE.CanvasTexture(handleCanvas);
+        handleTexture.wrapS = THREE.RepeatWrapping;
+        handleTexture.wrapT = THREE.RepeatWrapping;
+        
         // Bat handle
-        const handleGeometry = new THREE.CylinderGeometry(0.0075, 0.01, 0.1, 8);
-        // Wood texture for handle
-        const woodTexture = new THREE.TextureLoader().load('data:image/svg+xml;base64,' + btoa(`
-            <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <pattern id="wood" patternUnits="userSpaceOnUse" width="8" height="64">
-                        <rect width="8" height="64" fill="#8B4513"/>
-                        <rect x="0" y="0" width="8" height="2" fill="#A0522D"/>
-                        <rect x="0" y="8" width="8" height="1" fill="#A0522D"/>
-                        <rect x="0" y="16" width="8" height="2" fill="#CD853F"/>
-                        <rect x="0" y="24" width="8" height="1" fill="#A0522D"/>
-                        <rect x="0" y="32" width="8" height="3" fill="#DEB887"/>
-                        <rect x="0" y="40" width="8" height="1" fill="#A0522D"/>
-                        <rect x="0" y="48" width="8" height="2" fill="#CD853F"/>
-                        <rect x="0" y="56" width="8" height="1" fill="#A0522D"/>
-                    </pattern>
-                </defs>
-                <rect width="64" height="64" fill="url(#wood)"/>
-            </svg>
-        `));
-        woodTexture.wrapS = THREE.RepeatWrapping;
-        woodTexture.wrapT = THREE.RepeatWrapping;
-        woodTexture.repeat.set(1, 4);
-        const handleMaterial = new THREE.MeshLambertMaterial({ map: woodTexture });
+        const handleGeometry = new THREE.CylinderGeometry(0.0075, 0.01, 0.1, 16);
+        const handleMaterial = new THREE.MeshLambertMaterial({ map: handleTexture });
         const handle = new THREE.Mesh(handleGeometry, handleMaterial);
         handle.position.y = -0.05;
         batGroup.add(handle);
         
+        // Create realistic wood grain texture for barrel
+        const barrelCanvas = document.createElement('canvas');
+        barrelCanvas.width = 64;
+        barrelCanvas.height = 256;
+        const barrelCtx = barrelCanvas.getContext('2d');
+        
+        // Base wood color (lighter for barrel)
+        barrelCtx.fillStyle = '#DEB887';
+        barrelCtx.fillRect(0, 0, 64, 256);
+        
+        // Add wood grain lines
+        for (let i = 0; i < 25; i++) {
+            const y = (i / 25) * 256;
+            const variance = Math.sin(i * 0.3) * 6;
+            barrelCtx.strokeStyle = `rgba(210, 180, 140, ${0.2 + Math.random() * 0.3})`;
+            barrelCtx.lineWidth = 0.5 + Math.random() * 1.5;
+            barrelCtx.beginPath();
+            barrelCtx.moveTo(0, y);
+            barrelCtx.quadraticCurveTo(32 + variance, y + 3, 64, y);
+            barrelCtx.stroke();
+        }
+        
+        // Add lighter grain highlights
+        for (let i = 0; i < 12; i++) {
+            const y = Math.random() * 256;
+            barrelCtx.strokeStyle = `rgba(245, 222, 179, ${0.4 + Math.random() * 0.3})`;
+            barrelCtx.lineWidth = 0.3 + Math.random() * 0.7;
+            barrelCtx.beginPath();
+            barrelCtx.moveTo(0, y);
+            barrelCtx.lineTo(64, y + (Math.random() - 0.5) * 2);
+            barrelCtx.stroke();
+        }
+        
+        // Add some darker knots
+        for (let i = 0; i < 3; i++) {
+            const x = Math.random() * 64;
+            const y = Math.random() * 256;
+            barrelCtx.fillStyle = `rgba(160, 82, 45, ${0.3 + Math.random() * 0.2})`;
+            barrelCtx.beginPath();
+            barrelCtx.ellipse(x, y, 2 + Math.random() * 3, 1 + Math.random() * 2, 0, 0, Math.PI * 2);
+            barrelCtx.fill();
+        }
+        
+        const barrelTexture = new THREE.CanvasTexture(barrelCanvas);
+        barrelTexture.wrapS = THREE.RepeatWrapping;
+        barrelTexture.wrapT = THREE.RepeatWrapping;
+        
         // Bat barrel
-        const barrelGeometry = new THREE.CylinderGeometry(0.015, 0.0075, 0.175, 8);
-        // Lighter wood texture for barrel
-        const lightWoodTexture = new THREE.TextureLoader().load('data:image/svg+xml;base64,' + btoa(`
-            <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <pattern id="lightwood" patternUnits="userSpaceOnUse" width="8" height="64">
-                        <rect width="8" height="64" fill="#DEB887"/>
-                        <rect x="0" y="0" width="8" height="2" fill="#D2691E"/>
-                        <rect x="0" y="8" width="8" height="1" fill="#CD853F"/>
-                        <rect x="0" y="16" width="8" height="2" fill="#F4A460"/>
-                        <rect x="0" y="24" width="8" height="1" fill="#D2691E"/>
-                        <rect x="0" y="32" width="8" height="3" fill="#F5DEB3"/>
-                        <rect x="0" y="40" width="8" height="1" fill="#CD853F"/>
-                        <rect x="0" y="48" width="8" height="2" fill="#F4A460"/>
-                        <rect x="0" y="56" width="8" height="1" fill="#D2691E"/>
-                    </pattern>
-                </defs>
-                <rect width="64" height="64" fill="url(#lightwood)"/>
-            </svg>
-        `));
-        lightWoodTexture.wrapS = THREE.RepeatWrapping;
-        lightWoodTexture.wrapT = THREE.RepeatWrapping;
-        lightWoodTexture.repeat.set(1, 6);
-        const barrelMaterial = new THREE.MeshLambertMaterial({ map: lightWoodTexture });
+        const barrelGeometry = new THREE.CylinderGeometry(0.015, 0.0075, 0.175, 16);
+        const barrelMaterial = new THREE.MeshLambertMaterial({ map: barrelTexture });
         const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
         barrel.position.y = 0.0875;
         batGroup.add(barrel);
         
+        // Add rounded cap to the top of the barrel
+        const capGeometry = new THREE.SphereGeometry(0.015, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+        const capMaterial = new THREE.MeshLambertMaterial({ map: barrelTexture });
+        const cap = new THREE.Mesh(capGeometry, capMaterial);
+        cap.position.y = 0.175; // Position at top of barrel
+        batGroup.add(cap);
+        
+        // Create grip tape texture
+        const gripCanvas = document.createElement('canvas');
+        gripCanvas.width = 32;
+        gripCanvas.height = 32;
+        const gripCtx = gripCanvas.getContext('2d');
+        
+        // Base black color
+        gripCtx.fillStyle = '#1a1a1a';
+        gripCtx.fillRect(0, 0, 32, 32);
+        
+        // Add grip texture pattern
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if ((i + j) % 2 === 0) {
+                    gripCtx.fillStyle = '#0a0a0a';
+                    gripCtx.fillRect(i * 4, j * 4, 4, 4);
+                }
+            }
+        }
+        
+        const gripTexture = new THREE.CanvasTexture(gripCanvas);
+        gripTexture.wrapS = THREE.RepeatWrapping;
+        gripTexture.wrapT = THREE.RepeatWrapping;
+        
         // Grip tape
-        const gripGeometry = new THREE.CylinderGeometry(0.009, 0.009, 0.05, 8);
-        const gripMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+        const gripGeometry = new THREE.CylinderGeometry(0.009, 0.009, 0.05, 16);
+        const gripMaterial = new THREE.MeshLambertMaterial({ map: gripTexture });
         const grip = new THREE.Mesh(gripGeometry, gripMaterial);
         grip.position.y = -0.075;
         batGroup.add(grip);
@@ -196,19 +272,72 @@ class BaseballGame {
     }
     
     createBall() {
-        const ballGeometry = new THREE.SphereGeometry(0.3, 16, 16); // Much larger ball for visibility
-        const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const ballGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+        
+        // Create a canvas-based baseball texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw baseball base color
+        ctx.fillStyle = '#f8f5f0';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Draw the classic baseball stitching pattern
+        ctx.strokeStyle = '#cc0000';
+        ctx.lineWidth = 4;
+        
+        // Left curved seam
+        ctx.beginPath();
+        ctx.bezierCurveTo(128, 50, 50, 200, 100, 350);
+        ctx.bezierCurveTo(150, 450, 250, 500, 384, 462);
+        ctx.stroke();
+        
+        // Right curved seam
+        ctx.beginPath();
+        ctx.bezierCurveTo(384, 50, 462, 200, 412, 350);
+        ctx.bezierCurveTo(362, 450, 262, 500, 128, 462);
+        ctx.stroke();
+        
+        // Add individual stitches along the seams
+        ctx.strokeStyle = '#aa0000';
+        ctx.lineWidth = 2;
+        
+        // Left seam stitches
+        for (let i = 0; i < 15; i++) {
+            const t = i / 14;
+            const x1 = 128 + (100 - 128) * t + (384 - 100) * t * t;
+            const y1 = 50 + (350 - 50) * t + (462 - 350) * t * t;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1 - 8, y1 - 4);
+            ctx.lineTo(x1 + 8, y1 + 4);
+            ctx.stroke();
+        }
+        
+        // Right seam stitches
+        for (let i = 0; i < 15; i++) {
+            const t = i / 14;
+            const x1 = 384 + (412 - 384) * t + (128 - 412) * t * t;
+            const y1 = 50 + (350 - 50) * t + (462 - 350) * t * t;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1 - 8, y1 - 4);
+            ctx.lineTo(x1 + 8, y1 + 4);
+            ctx.stroke();
+        }
+        
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        
+        const ballMaterial = new THREE.MeshLambertMaterial({ 
+            map: texture
+        });
+        
         this.ball = new THREE.Mesh(ballGeometry, ballMaterial);
-        
-        // Baseball stitching (scaled to match ball size)
-        const stitchingGeometry = new THREE.TorusGeometry(0.3, 0.01, 4, 8);
-        const stitchingMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-        const stitching1 = new THREE.Mesh(stitchingGeometry, stitchingMaterial);
-        const stitching2 = new THREE.Mesh(stitchingGeometry, stitchingMaterial);
-        stitching2.rotation.y = Math.PI / 2;
-        
-        this.ball.add(stitching1);
-        this.ball.add(stitching2);
         
         // Don't start with a ball - wait for timer
         this.ball.position.set(0, -100, 0); // Hide ball initially
@@ -351,8 +480,120 @@ class BaseballGame {
         document.getElementById('ballSpeed').textContent = this.ballSpeed;
     }
     
+    callStrike() {
+        this.strikes++;
+        console.log(`Strike ${this.strikes}!`);
+        
+        // Use speech synthesis to call the strike
+        if (this.synth) {
+            const utterance = new SpeechSynthesisUtterance(`Strike ${this.strikes}!`);
+            utterance.volume = 0.8;
+            utterance.rate = 1.2;
+            utterance.pitch = 1.0;
+            this.synth.speak(utterance);
+        }
+        
+        // Update UI to show strike count
+        const strikeDisplay = document.getElementById('ballSpeed');
+        strikeDisplay.textContent = `STRIKES: ${this.strikes}`;
+        strikeDisplay.style.color = this.strikes >= 2 ? '#ff4444' : '#ffffff';
+        
+        // Check if player is out
+        if (this.strikes >= 3) {
+            this.endGame();
+        }
+    }
+    
+    endGame() {
+        this.gameOver = true;
+        this.ballInPlay = false;
+        
+        // Hide the ball
+        this.ball.position.set(0, -100, 0);
+        
+        // Final "You're out!" announcement
+        if (this.synth) {
+            const utterance = new SpeechSynthesisUtterance("You're out!");
+            utterance.volume = 1.0;
+            utterance.rate = 1.0;
+            utterance.pitch = 0.8;
+            this.synth.speak(utterance);
+        }
+        
+        // Show game over screen
+        this.showGameOverScreen();
+    }
+    
+    showGameOverScreen() {
+        // Create game over overlay
+        const gameOverDiv = document.createElement('div');
+        gameOverDiv.id = 'gameOver';
+        gameOverDiv.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+        `;
+        
+        gameOverDiv.innerHTML = `
+            <h1 style="font-size: 4em; margin: 0; color: #ff4444; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">STRIKE 3!</h1>
+            <h2 style="font-size: 3em; margin: 20px 0; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">YOU'RE OUT!</h2>
+            <div style="font-size: 2em; margin: 20px 0; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; border: 2px solid #444;">
+                Final Score: <span style="color: #44ff44; font-weight: bold;">${this.score}</span>
+            </div>
+            <button id="restartGame" style="
+                font-size: 1.5em;
+                padding: 15px 30px;
+                background: #44aa44;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                cursor: pointer;
+                margin-top: 30px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            ">Play Again</button>
+        `;
+        
+        document.body.appendChild(gameOverDiv);
+        
+        // Add restart functionality
+        document.getElementById('restartGame').addEventListener('click', () => {
+            document.body.removeChild(gameOverDiv);
+            this.restartGame();
+        });
+    }
+    
+    restartGame() {
+        // Reset game state
+        this.score = 0;
+        this.strikes = 0;
+        this.gameOver = false;
+        this.ballInPlay = false;
+        this.ballSpeed = 60;
+        this.ballTimer = Date.now() + 500;
+        
+        // Update UI
+        document.getElementById('score').textContent = this.score;
+        document.getElementById('ballSpeed').textContent = this.ballSpeed;
+        document.getElementById('ballSpeed').style.color = '#ffffff';
+        
+        // Hide ball initially
+        this.ball.position.set(0, -100, 0);
+        
+        console.log('Game restarted!');
+    }
+    
     updateBall() {
-        if (!this.ballInPlay) return;
+        if (!this.ballInPlay || this.gameOver) return;
         
         // Apply pitch-specific physics
         this.applyPitchPhysics();
@@ -381,13 +622,22 @@ class BaseballGame {
         // Increment pitch frame counter
         this.ball.pitchFrame++;
         
-        // Reset if ball goes too far in any direction or hits ground
-        if (this.ball.position.z > 50 || this.ball.position.z < -70 || 
+        // Check if ball passed the batter (missed swing) - this is a strike
+        if (this.ball.position.z > 5 && this.ballInPlay) {
+            this.callStrike(); // Ball passed the batter - it's a strike!
+            this.ball.position.set(0, -100, 0); // Hide ball
+            this.ballInPlay = false;
+            if (!this.gameOver) {
+                this.ballTimer = Date.now() + 1500; // Next ball in 1.5 seconds after a strike
+            }
+        }
+        // Reset if ball goes too far in other directions or hits ground
+        else if (this.ball.position.z < -70 || 
             Math.abs(this.ball.position.x) > 50 || this.ball.position.y < -1) {
             this.ball.position.set(0, -100, 0); // Hide ball
             this.ballInPlay = false;
             // Only set timer if not already set (to avoid overriding hit timer)
-            if (Date.now() > this.ballTimer) {
+            if (Date.now() > this.ballTimer && !this.gameOver) {
                 this.ballTimer = Date.now() + 200; // Next ball in 0.2 seconds
             }
         }
@@ -424,6 +674,12 @@ class BaseballGame {
     
     animate() {
         requestAnimationFrame(() => this.animate());
+        
+        // Don't throw new balls if game is over
+        if (this.gameOver) {
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
         
         // Continuous ball throwing - throw new ball when current ball is halfway to plate
         if (!this.ballInPlay && Date.now() > this.ballTimer) {
