@@ -75,22 +75,45 @@ class BaseballGame {
     }
     
     createField() {
-        // Grass field
-        const fieldGeometry = new THREE.PlaneGeometry(200, 200);
-        const grassTexture = new THREE.TextureLoader().load('data:image/svg+xml;base64,' + btoa(`
-            <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
-                <rect width="64" height="64" fill="#2E7D32"/>
-                <g stroke="#4CAF50" stroke-width="0.5" opacity="0.7">
-                    <path d="M0,10 Q10,5 20,10 T40,10 T60,10 L64,10"/>
-                    <path d="M0,25 Q15,20 30,25 T64,25"/>
-                    <path d="M0,40 Q20,35 40,40 T64,40"/>
-                    <path d="M0,55 Q25,50 50,55 L64,55"/>
-                </g>
-            </svg>
-        `));
+        // Create realistic baseball stadium skybox
+        this.createStadiumSkybox();
+        
+        // Enhanced grass field with realistic baseball field dimensions
+        const fieldGeometry = new THREE.PlaneGeometry(300, 300);
+        
+        // Create more realistic grass texture
+        const grassCanvas = document.createElement('canvas');
+        grassCanvas.width = 256;
+        grassCanvas.height = 256;
+        const ctx = grassCanvas.getContext('2d');
+        
+        // Base grass color with variations
+        const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        gradient.addColorStop(0, '#2E7D32');
+        gradient.addColorStop(0.5, '#388E3C');
+        gradient.addColorStop(1, '#1B5E20');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 256, 256);
+        
+        // Add grass blade details
+        for (let i = 0; i < 1000; i++) {
+            const x = Math.random() * 256;
+            const y = Math.random() * 256;
+            const length = 2 + Math.random() * 4;
+            const width = 0.5 + Math.random() * 1;
+            
+            ctx.strokeStyle = `rgba(46, 125, 50, ${0.3 + Math.random() * 0.4})`;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + (Math.random() - 0.5) * 2, y - length);
+            ctx.stroke();
+        }
+        
+        const grassTexture = new THREE.CanvasTexture(grassCanvas);
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
-        grassTexture.repeat.set(20, 20);
+        grassTexture.repeat.set(50, 50);
         
         const fieldMaterial = new THREE.MeshLambertMaterial({ map: grassTexture });
         this.field = new THREE.Mesh(fieldGeometry, fieldMaterial);
@@ -98,31 +121,317 @@ class BaseballGame {
         this.field.receiveShadow = true;
         this.scene.add(this.field);
         
-        // Home plate
-        const plateGeometry = new THREE.BoxGeometry(0.4, 0.02, 0.4);
-        const plateMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        // Create dirt infield with proper baseball field shape
+        this.createInfield();
+        
+        // Create foul lines
+        this.createFoulLines();
+        
+        // Enhanced home plate
+        const plateGeometry = new THREE.BoxGeometry(0.43, 0.02, 0.43);
+        const plateMaterial = new THREE.MeshLambertMaterial({ color: 0xf5f5f5 });
         const homePlate = new THREE.Mesh(plateGeometry, plateMaterial);
         homePlate.position.set(0, 0.01, 0);
         this.scene.add(homePlate);
         
-        // Pitcher's mound
-        const moundGeometry = new THREE.CylinderGeometry(3, 4, 0.5, 16);
+        // Batter's boxes
+        this.createBattersBoxes();
+        
+        // Enhanced pitcher's mound with proper MLB dimensions
+        const moundGeometry = new THREE.CylinderGeometry(2.7, 3.0, 0.25, 32);
         const moundMaterial = new THREE.MeshLambertMaterial({ color: 0x8D6E63 });
         const pitchersMound = new THREE.Mesh(moundGeometry, moundMaterial);
-        pitchersMound.position.set(0, 0.25, -60.5);
+        pitchersMound.position.set(0, 0.125, -18.44); // 60 feet 6 inches from home plate
         pitchersMound.receiveShadow = true;
         this.scene.add(pitchersMound);
         
-        // Backstop
-        const backstopGeometry = new THREE.PlaneGeometry(20, 10);
+        // Pitcher's rubber
+        const rubberGeometry = new THREE.BoxGeometry(0.61, 0.03, 0.15);
+        const rubberMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const pitchersRubber = new THREE.Mesh(rubberGeometry, rubberMaterial);
+        pitchersRubber.position.set(0, 0.265, -18.44);
+        this.scene.add(pitchersRubber);
+        
+        // Create stadium elements
+        this.createStadiumElements();
+        
+        // Enhanced backstop with netting
+        this.createBackstop();
+    }
+    
+    createStadiumSkybox() {
+        // Create a realistic baseball stadium skybox using canvas-generated textures
+        const skyboxGeometry = new THREE.SphereGeometry(400, 32, 32);
+        
+        // Create stadium panorama texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 2048;
+        canvas.height = 1024;
+        const ctx = canvas.getContext('2d');
+        
+        // Sky gradient (top portion)
+        const skyGradient = ctx.createLinearGradient(0, 0, 0, 400);
+        skyGradient.addColorStop(0, '#87CEEB'); // Sky blue
+        skyGradient.addColorStop(0.3, '#B0E0E6'); // Powder blue
+        skyGradient.addColorStop(0.7, '#F0F8FF'); // Alice blue
+        skyGradient.addColorStop(1, '#ffffff'); // White at horizon
+        ctx.fillStyle = skyGradient;
+        ctx.fillRect(0, 0, 2048, 400);
+        
+        // Stadium stands (middle portion)
+        const standsGradient = ctx.createLinearGradient(0, 400, 0, 700);
+        standsGradient.addColorStop(0, '#8B4513'); // Saddle brown
+        standsGradient.addColorStop(0.2, '#A0522D'); // Sienna  
+        standsGradient.addColorStop(0.5, '#CD853F'); // Peru
+        standsGradient.addColorStop(0.8, '#DEB887'); // Burlywood
+        standsGradient.addColorStop(1, '#F5DEB3'); // Wheat
+        ctx.fillStyle = standsGradient;
+        ctx.fillRect(0, 400, 2048, 300);
+        
+        // Add stadium structure details
+        for (let i = 0; i < 20; i++) {
+            const x = (i / 20) * 2048;
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, 400);
+            ctx.lineTo(x, 700);
+            ctx.stroke();
+            
+            // Add seating sections
+            for (let j = 0; j < 15; j++) {
+                const y = 420 + j * 18;
+                ctx.fillStyle = j % 2 === 0 ? '#B8860B' : '#DAA520';
+                ctx.fillRect(x, y, 2048/20, 8);
+            }
+        }
+        
+        // Ground/field area (bottom portion)
+        const fieldGradient = ctx.createLinearGradient(0, 700, 0, 1024);
+        fieldGradient.addColorStop(0, '#228B22'); // Forest green
+        fieldGradient.addColorStop(0.5, '#32CD32'); // Lime green
+        fieldGradient.addColorStop(1, '#7CFC00'); // Lawn green
+        ctx.fillStyle = fieldGradient;
+        ctx.fillRect(0, 700, 2048, 324);
+        
+        // Add some stadium lights
+        for (let i = 0; i < 8; i++) {
+            const x = (i / 8) * 2048 + 128;
+            const y = 350;
+            ctx.fillStyle = '#FFFACD';
+            ctx.beginPath();
+            ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Light glow effect
+            const lightGradient = ctx.createRadialGradient(x, y, 0, x, y, 40);
+            lightGradient.addColorStop(0, 'rgba(255, 250, 205, 0.8)');
+            lightGradient.addColorStop(1, 'rgba(255, 250, 205, 0)');
+            ctx.fillStyle = lightGradient;
+            ctx.beginPath();
+            ctx.arc(x, y, 40, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        const skyboxTexture = new THREE.CanvasTexture(canvas);
+        const skyboxMaterial = new THREE.MeshBasicMaterial({ 
+            map: skyboxTexture,
+            side: THREE.BackSide
+        });
+        
+        const skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
+        this.scene.add(skybox);
+    }
+    
+    createInfield() {
+        // Create dirt infield in proper baseball diamond shape
+        const infieldShape = new THREE.Shape();
+        
+        // Start at home plate and create diamond shape
+        infieldShape.moveTo(0, 0);
+        infieldShape.lineTo(-27.43, -27.43); // First base (90 feet)
+        infieldShape.lineTo(0, -54.86); // Second base
+        infieldShape.lineTo(27.43, -27.43); // Third base
+        infieldShape.closePath();
+        
+        const infieldGeometry = new THREE.ShapeGeometry(infieldShape);
+        const infieldMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); // Tan dirt color
+        const infield = new THREE.Mesh(infieldGeometry, infieldMaterial);
+        infield.rotation.x = -Math.PI / 2;
+        infield.position.y = 0.005; // Slightly above grass
+        infield.receiveShadow = true;
+        this.scene.add(infield);
+        
+        // Add pitcher's mound dirt area
+        const moundDirtGeometry = new THREE.CircleGeometry(5, 32);
+        const moundDirt = new THREE.Mesh(moundDirtGeometry, infieldMaterial);
+        moundDirt.rotation.x = -Math.PI / 2;
+        moundDirt.position.set(0, 0.005, -18.44);
+        moundDirt.receiveShadow = true;
+        this.scene.add(moundDirt);
+    }
+    
+    createFoulLines() {
+        // First base foul line
+        const lineGeometry = new THREE.BoxGeometry(0.1, 0.01, 130);
+        const lineMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        
+        const firstBaseLine = new THREE.Mesh(lineGeometry, lineMaterial);
+        firstBaseLine.position.set(45, 0.006, -65);
+        firstBaseLine.rotation.y = Math.PI / 4;
+        this.scene.add(firstBaseLine);
+        
+        // Third base foul line
+        const thirdBaseLine = new THREE.Mesh(lineGeometry, lineMaterial);
+        thirdBaseLine.position.set(-45, 0.006, -65);
+        thirdBaseLine.rotation.y = -Math.PI / 4;
+        this.scene.add(thirdBaseLine);
+    }
+    
+    createBattersBoxes() {
+        const boxGeometry = new THREE.BoxGeometry(1.22, 0.01, 1.83); // MLB regulation size
+        const boxMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C });
+        
+        // Left batter's box
+        const leftBox = new THREE.Mesh(boxGeometry, boxMaterial);
+        leftBox.position.set(-0.15, 0.005, 0);
+        this.scene.add(leftBox);
+        
+        // Right batter's box  
+        const rightBox = new THREE.Mesh(boxGeometry, boxMaterial);
+        rightBox.position.set(0.15, 0.005, 0);
+        this.scene.add(rightBox);
+    }
+    
+    createStadiumElements() {
+        // Create outfield wall
+        const wallHeight = 3.66; // 12 feet (Green Monster height)
+        const wallGeometry = new THREE.BoxGeometry(150, wallHeight, 0.5);
+        const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+        const outfieldWall = new THREE.Mesh(wallGeometry, wallMaterial);
+        outfieldWall.position.set(0, wallHeight / 2, -120);
+        outfieldWall.receiveShadow = true;
+        this.scene.add(outfieldWall);
+        
+        // Add foul pole markers
+        const poleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 15, 8);
+        const poleMaterial = new THREE.MeshLambertMaterial({ color: 0xFFD700 }); // Gold
+        
+        const leftFoulPole = new THREE.Mesh(poleGeometry, poleMaterial);
+        leftFoulPole.position.set(-95, 7.5, -95);
+        this.scene.add(leftFoulPole);
+        
+        const rightFoulPole = new THREE.Mesh(poleGeometry, poleMaterial);
+        rightFoulPole.position.set(95, 7.5, -95);
+        this.scene.add(rightFoulPole);
+        
+        // Create dugouts
+        this.createDugouts();
+        
+        // Add stadium seating sections visible from home plate
+        this.createVisibleSeating();
+    }
+    
+    createDugouts() {
+        const dugoutGeometry = new THREE.BoxGeometry(15, 2, 3);
+        const dugoutMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        
+        // First base dugout
+        const firstBaseDugout = new THREE.Mesh(dugoutGeometry, dugoutMaterial);
+        firstBaseDugout.position.set(20, 0, 15);
+        this.scene.add(firstBaseDugout);
+        
+        // Third base dugout
+        const thirdBaseDugout = new THREE.Mesh(dugoutGeometry, dugoutMaterial);
+        thirdBaseDugout.position.set(-20, 0, 15);
+        this.scene.add(thirdBaseDugout);
+    }
+    
+    createVisibleSeating() {
+        // Create seating sections behind home plate and down the foul lines
+        const seatGeometry = new THREE.BoxGeometry(50, 20, 5);
+        const seatMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        
+        // Behind home plate seating
+        const homeSeating = new THREE.Mesh(seatGeometry, seatMaterial);
+        homeSeating.position.set(0, 10, 35);
+        this.scene.add(homeSeating);
+        
+        // Upper deck behind home plate
+        const upperSeating = new THREE.Mesh(seatGeometry, seatMaterial);
+        upperSeating.position.set(0, 25, 40);
+        this.scene.add(upperSeating);
+        
+        // First base side seating
+        const firstBaseSeating = new THREE.Mesh(seatGeometry, seatMaterial);
+        firstBaseSeating.position.set(40, 10, 20);
+        firstBaseSeating.rotation.y = -Math.PI / 6;
+        this.scene.add(firstBaseSeating);
+        
+        // Third base side seating  
+        const thirdBaseSeating = new THREE.Mesh(seatGeometry, seatMaterial);
+        thirdBaseSeating.position.set(-40, 10, 20);
+        thirdBaseSeating.rotation.y = Math.PI / 6;
+        this.scene.add(thirdBaseSeating);
+    }
+    
+    createBackstop() {
+        // Main backstop structure
+        const backstopGeometry = new THREE.BoxGeometry(30, 12, 0.2);
         const backstopMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0x333333,
+            color: 0x444444,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.7
         });
         const backstop = new THREE.Mesh(backstopGeometry, backstopMaterial);
-        backstop.position.set(0, 5, 15);
+        backstop.position.set(0, 6, 18);
         this.scene.add(backstop);
+        
+        // Create netting effect
+        const nettingGeometry = new THREE.PlaneGeometry(30, 12);
+        
+        // Create netting texture
+        const nettingCanvas = document.createElement('canvas');
+        nettingCanvas.width = 256;
+        nettingCanvas.height = 256;
+        const nettingCtx = nettingCanvas.getContext('2d');
+        
+        // Transparent background
+        nettingCtx.fillStyle = 'rgba(0,0,0,0)';
+        nettingCtx.fillRect(0, 0, 256, 256);
+        
+        // Draw diamond mesh pattern
+        nettingCtx.strokeStyle = 'rgba(100, 100, 100, 0.8)';
+        nettingCtx.lineWidth = 1;
+        
+        const spacing = 8;
+        for (let i = 0; i < 256; i += spacing) {
+            for (let j = 0; j < 256; j += spacing) {
+                nettingCtx.beginPath();
+                nettingCtx.moveTo(i, j);
+                nettingCtx.lineTo(i + spacing/2, j + spacing/2);
+                nettingCtx.lineTo(i, j + spacing);
+                nettingCtx.lineTo(i - spacing/2, j + spacing/2);
+                nettingCtx.closePath();
+                nettingCtx.stroke();
+            }
+        }
+        
+        const nettingTexture = new THREE.CanvasTexture(nettingCanvas);
+        nettingTexture.repeat.set(4, 4);
+        nettingTexture.wrapS = THREE.RepeatWrapping;
+        nettingTexture.wrapT = THREE.RepeatWrapping;
+        
+        const nettingMaterial = new THREE.MeshBasicMaterial({ 
+            map: nettingTexture,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide
+        });
+        
+        const netting = new THREE.Mesh(nettingGeometry, nettingMaterial);
+        netting.position.set(0, 6, 18.1);
+        this.scene.add(netting);
     }
     
     createBat() {
@@ -358,12 +667,18 @@ class BaseballGame {
             startX += (Math.random() > 0.5 ? 0.3 : -0.3); // Start slightly off center
         }
         
-        this.ball.position.set(startX, startY, -30);
+        this.ball.position.set(startX, startY, -18.44);
         
         // Set initial velocity based on pitch type
         this.ball.velocity = this.getPitchVelocity(this.currentPitch);
         this.ball.pitchType = this.currentPitch;
         this.ball.pitchFrame = 0; // Track frames for curve calculation
+        
+        // Clear any hit-related properties for new ball
+        this.ball.hitType = null;
+        this.ball.hitQuality = null;
+        this.ball.backspin = null;
+        this.ball.topspin = null;
         
         this.ballInPlay = true;
         console.log('Throwing', this.currentPitch, 'at:', this.ball.position, 'velocity:', this.ball.velocity);
@@ -436,46 +751,137 @@ class BaseballGame {
         this.score++;
         document.getElementById('score').textContent = this.score;
         
-        // Calculate hit direction based on bat and ball positions
+        // Get exact positions
         const batPosition = this.bat.position.clone();
         const ballPosition = this.ball.position.clone();
         
-        // Calculate the direction from bat to where the ball should go
-        const hitDirection = new THREE.Vector3();
-        hitDirection.x = ballPosition.x - batPosition.x; // Left/right based on contact point
-        hitDirection.y = 0.5; // Always hit upward
-        hitDirection.z = -1; // Always hit away from pitcher
+        // Calculate contact point relative to bat center and orientation
+        const contactPoint = ballPosition.clone().sub(batPosition);
         
-        // Normalize and scale the hit direction
-        hitDirection.normalize();
+        // Determine where on the bat the ball made contact
+        // Bat is angled, so we need to consider its rotation
+        const batAngle = this.bat.rotation.z; // Current bat angle
         
-        // Determine hit strength based on how centered the contact was
-        const contactDistance = batPosition.distanceTo(ballPosition);
-        const maxDistance = 0.8; // Max hit detection distance
-        const hitStrength = (maxDistance - contactDistance) / maxDistance; // Better contact = stronger hit
+        // Transform contact point to bat's local coordinate system
+        const localContact = new THREE.Vector3(
+            contactPoint.x * Math.cos(-batAngle) - contactPoint.y * Math.sin(-batAngle),
+            contactPoint.x * Math.sin(-batAngle) + contactPoint.y * Math.cos(-batAngle),
+            contactPoint.z
+        );
         
-        // Calculate final velocity
-        const baseSpeed = 2.0 + hitStrength * 2.0; // Speed varies from 2 to 4 based on contact
-        this.ball.velocity.x = hitDirection.x * baseSpeed;
-        this.ball.velocity.y = hitDirection.y * baseSpeed * (0.8 + hitStrength * 0.7); // Height varies with contact quality
-        this.ball.velocity.z = hitDirection.z * baseSpeed;
+        // Determine hit type based on contact location on bat
+        const contactHeight = localContact.y; // How high/low on bat
+        const contactSide = localContact.x;    // How far left/right of bat center
+        const contactTiming = Math.abs(localContact.z); // How early/late the contact
         
-        // Add some spin effect based on bat position
-        if (batPosition.x > ballPosition.x) {
-            // Bat is to the right of ball - adds right spin
-            this.ball.velocity.x += 0.3;
-        } else if (batPosition.x < ballPosition.x) {
-            // Bat is to the left of ball - adds left spin  
-            this.ball.velocity.x -= 0.3;
+        // Calculate base hit direction
+        let hitDirection = new THREE.Vector3();
+        
+        // Horizontal direction based on contact timing and bat angle
+        if (contactTiming < 0.1) {
+            // Perfect timing - hit straight ahead with slight pull
+            hitDirection.x = contactSide * 2.0 + (Math.random() - 0.5) * 0.3;
+        } else {
+            // Late/early contact affects direction more dramatically
+            const timingFactor = contactTiming * 10;
+            hitDirection.x = contactSide * 3.0 + timingFactor * (contactTiming > 0 ? 1 : -1);
         }
         
-        console.log('Ball hit! Direction:', hitDirection, 'Strength:', hitStrength, 'New velocity:', this.ball.velocity);
+        // Vertical direction based on contact height on bat
+        if (contactHeight > 0.05) {
+            // Hit high on bat = ground ball or line drive
+            hitDirection.y = 0.2 + Math.random() * 0.3;
+        } else if (contactHeight < -0.05) {
+            // Hit low on bat = pop fly
+            hitDirection.y = 0.8 + Math.random() * 0.5;
+        } else {
+            // Sweet spot = line drive
+            hitDirection.y = 0.4 + Math.random() * 0.2;
+        }
+        
+        // Always hit away from pitcher, but with some variation
+        hitDirection.z = -1.0 + Math.random() * 0.2;
+        
+        // Calculate hit quality based on multiple factors
+        const sweetSpotDistance = Math.abs(contactHeight); // Distance from bat's sweet spot
+        const timingQuality = Math.max(0, 1 - contactTiming * 5); // Better timing = higher quality
+        const solidContact = Math.max(0, 1 - Math.abs(contactSide) * 2); // Center contact is better
+        
+        const hitQuality = (timingQuality * 0.4 + solidContact * 0.4 + (1 - sweetSpotDistance * 10) * 0.2);
+        const clampedQuality = Math.max(0.1, Math.min(1.0, hitQuality));
+        
+        // Determine hit type and adjust accordingly
+        let hitType = 'line_drive';
+        if (hitDirection.y > 0.7) {
+            hitType = 'pop_fly';
+        } else if (hitDirection.y < 0.3) {
+            hitType = 'ground_ball';
+        }
+        
+        // Base speed varies significantly with hit quality and type
+        let baseSpeed;
+        switch(hitType) {
+            case 'pop_fly':
+                baseSpeed = 1.5 + clampedQuality * 1.0; // Pop flies are slower
+                hitDirection.y *= 1.5; // More upward trajectory
+                break;
+            case 'ground_ball':
+                baseSpeed = 2.5 + clampedQuality * 1.5; // Ground balls can be fast
+                hitDirection.y *= 0.5; // Keep it low
+                break;
+            case 'line_drive':
+            default:
+                baseSpeed = 2.0 + clampedQuality * 2.5; // Line drives can be very fast
+                break;
+        }
+        
+        // Apply realistic physics - normalize then scale
+        hitDirection.normalize();
+        
+        // Set final velocity with some randomness for realism
+        const speedVariation = 0.8 + Math.random() * 0.4; // ±20% speed variation
+        this.ball.velocity.x = hitDirection.x * baseSpeed * speedVariation;
+        this.ball.velocity.y = hitDirection.y * baseSpeed * speedVariation;
+        this.ball.velocity.z = hitDirection.z * baseSpeed * speedVariation;
+        
+        // Add spin effects based on contact
+        const spinFactor = clampedQuality * 0.3;
+        
+        // Side spin based on bat angle and contact point
+        if (hitDirection.x > 0) {
+            this.ball.velocity.x += spinFactor; // Hook/slice right
+        } else {
+            this.ball.velocity.x -= spinFactor; // Hook/slice left
+        }
+        
+        // Backspin/topspin based on contact height
+        if (hitType === 'line_drive') {
+            // Line drives get backspin (helps carry)
+            this.ball.backspin = 0.01 * clampedQuality;
+        } else if (hitType === 'ground_ball') {
+            // Ground balls get topspin
+            this.ball.topspin = 0.008 * clampedQuality;
+        }
+        
+        // Store hit information for physics updates
+        this.ball.hitType = hitType;
+        this.ball.hitQuality = clampedQuality;
+        
+        console.log(`${hitType.toUpperCase()} hit!`, {
+            quality: clampedQuality.toFixed(2),
+            contact: { height: contactHeight.toFixed(3), side: contactSide.toFixed(3), timing: contactTiming.toFixed(3) },
+            velocity: {
+                x: this.ball.velocity.x.toFixed(2),
+                y: this.ball.velocity.y.toFixed(2), 
+                z: this.ball.velocity.z.toFixed(2)
+            }
+        });
         
         // Keep ball in play to show the hit trajectory
         this.ballInPlay = true;
         
         // Reset ball timer for after the hit ball finishes its flight
-        this.ballTimer = Date.now() + 800; // Next ball in 0.8 seconds
+        this.ballTimer = Date.now() + 1200; // Longer delay to watch the hit
         this.ballSpeed = Math.min(this.ballSpeed + 2, 100);
         document.getElementById('ballSpeed').textContent = this.ballSpeed;
     }
@@ -595,51 +1001,154 @@ class BaseballGame {
     updateBall() {
         if (!this.ballInPlay || this.gameOver) return;
         
-        // Apply pitch-specific physics
-        this.applyPitchPhysics();
+        // Check if ball has been hit (has hitType) or is still a pitch
+        if (this.ball.hitType) {
+            // Ball has been hit - apply hit ball physics
+            this.applyHitBallPhysics();
+        } else {
+            // Ball is still being pitched - apply pitch physics
+            this.applyPitchPhysics();
+        }
         
         // Update ball position
         this.ball.position.x += this.ball.velocity.x;
         this.ball.position.y += this.ball.velocity.y;
         this.ball.position.z += this.ball.velocity.z;
         
-        // Apply gravity (varies by pitch type)
-        let gravityEffect = 0.0002;
-        if (this.ball.pitchType === 'changeup') {
-            gravityEffect = 0.0001; // Less drop for changeup
+        // Apply gravity based on ball state
+        let gravityEffect;
+        if (this.ball.hitType) {
+            // Hit ball physics
+            gravityEffect = 0.0015; // Stronger gravity for hit balls
+            
+            // Apply spin effects
+            if (this.ball.backspin) {
+                // Backspin reduces gravity effect (ball carries further)
+                gravityEffect *= (1 - this.ball.backspin * 50);
+                this.ball.backspin *= 0.995; // Spin decays over time
+            }
+            if (this.ball.topspin) {
+                // Topspin increases gravity effect (ball drops faster)
+                gravityEffect *= (1 + this.ball.topspin * 30);
+                this.ball.topspin *= 0.995; // Spin decays over time
+            }
+            
+            // Air resistance for hit balls
+            const airResistance = 0.999;
+            this.ball.velocity.x *= airResistance;
+            this.ball.velocity.z *= airResistance;
+        } else {
+            // Pitched ball gravity
+            gravityEffect = 0.0002;
+            if (this.ball.pitchType === 'changeup') {
+                gravityEffect = 0.0001; // Less drop for changeup
+            }
         }
+        
         this.ball.velocity.y -= gravityEffect;
         
-        // Ball rotation varies by pitch
-        if (this.ball.pitchType === 'slider') {
-            this.ball.rotation.x += 0.25;
-            this.ball.rotation.y += 0.4; // Moderate side spin
+        // Ball rotation
+        if (this.ball.hitType) {
+            // Hit ball rotation based on velocity and spin
+            const rotationSpeed = Math.sqrt(
+                this.ball.velocity.x * this.ball.velocity.x + 
+                this.ball.velocity.z * this.ball.velocity.z
+            ) * 0.1;
+            this.ball.rotation.x += rotationSpeed;
+            this.ball.rotation.y += rotationSpeed * 0.5;
+            
+            // Add spin-based rotation effects
+            if (this.ball.backspin) {
+                this.ball.rotation.x += this.ball.backspin * 10;
+            }
+            if (this.ball.topspin) {
+                this.ball.rotation.x -= this.ball.topspin * 10;
+            }
         } else {
-            this.ball.rotation.x += 0.3;
-            this.ball.rotation.y += 0.2;
-        }
-        
-        // Increment pitch frame counter
-        this.ball.pitchFrame++;
-        
-        // Check if ball passed the batter (missed swing) - this is a strike
-        if (this.ball.position.z > 5 && this.ballInPlay) {
-            this.callStrike(); // Ball passed the batter - it's a strike!
-            this.ball.position.set(0, -100, 0); // Hide ball
-            this.ballInPlay = false;
-            if (!this.gameOver) {
-                this.ballTimer = Date.now() + 1500; // Next ball in 1.5 seconds after a strike
+            // Pitched ball rotation
+            if (this.ball.pitchType === 'slider') {
+                this.ball.rotation.x += 0.25;
+                this.ball.rotation.y += 0.4; // Moderate side spin
+            } else {
+                this.ball.rotation.x += 0.3;
+                this.ball.rotation.y += 0.2;
             }
         }
-        // Reset if ball goes too far in other directions or hits ground
-        else if (this.ball.position.z < -70 || 
-            Math.abs(this.ball.position.x) > 50 || this.ball.position.y < -1) {
-            this.ball.position.set(0, -100, 0); // Hide ball
-            this.ballInPlay = false;
-            // Only set timer if not already set (to avoid overriding hit timer)
-            if (Date.now() > this.ballTimer && !this.gameOver) {
-                this.ballTimer = Date.now() + 200; // Next ball in 0.2 seconds
+        
+        // Increment frame counter
+        if (this.ball.pitchFrame !== undefined) {
+            this.ball.pitchFrame++;
+        }
+        
+        // Ball boundary checks
+        if (this.ball.hitType) {
+            // Hit ball - larger boundaries, check for ground contact
+            if (this.ball.position.y <= 0 && this.ball.velocity.y < 0) {
+                // Ball hit the ground
+                if (this.ball.hitType === 'ground_ball') {
+                    // Ground balls bounce and roll
+                    this.ball.position.y = 0;
+                    this.ball.velocity.y = -this.ball.velocity.y * 0.3; // Small bounce
+                    this.ball.velocity.x *= 0.8; // Friction
+                    this.ball.velocity.z *= 0.8; // Friction
+                    
+                    // Stop bouncing when velocity is very low
+                    if (Math.abs(this.ball.velocity.y) < 0.05) {
+                        this.ball.velocity.y = 0;
+                    }
+                } else {
+                    // Pop flies and line drives that hit ground
+                    this.ball.position.y = 0;
+                    this.ball.velocity.y = 0;
+                    this.ball.velocity.x *= 0.5;
+                    this.ball.velocity.z *= 0.5;
+                }
             }
+            
+            // Remove ball if it goes too far or stops moving
+            if (this.ball.position.z < -200 || 
+                Math.abs(this.ball.position.x) > 150 || 
+                this.ball.position.y > 100 ||
+                (this.ball.position.y <= 0 && 
+                 Math.abs(this.ball.velocity.x) < 0.1 && 
+                 Math.abs(this.ball.velocity.z) < 0.1)) {
+                this.ball.position.set(0, -100, 0); // Hide ball
+                this.ballInPlay = false;
+                if (Date.now() > this.ballTimer && !this.gameOver) {
+                    this.ballTimer = Date.now() + 500; // Next ball
+                }
+            }
+        } else {
+            // Pitched ball - original boundary checks
+            if (this.ball.position.z > 5 && this.ballInPlay) {
+                this.callStrike(); // Ball passed the batter - it's a strike!
+                this.ball.position.set(0, -100, 0); // Hide ball
+                this.ballInPlay = false;
+                if (!this.gameOver) {
+                    this.ballTimer = Date.now() + 1500; // Next ball in 1.5 seconds after a strike
+                }
+            }
+            else if (this.ball.position.z < -70 || 
+                Math.abs(this.ball.position.x) > 50 || this.ball.position.y < -1) {
+                this.ball.position.set(0, -100, 0); // Hide ball
+                this.ballInPlay = false;
+                if (Date.now() > this.ballTimer && !this.gameOver) {
+                    this.ballTimer = Date.now() + 200; // Next ball in 0.2 seconds
+                }
+            }
+        }
+    }
+    
+    applyHitBallPhysics() {
+        // Additional physics for hit balls can be added here
+        // This is where we could add wind effects, air density, etc.
+        
+        // Slight trajectory adjustments based on hit quality
+        if (this.ball.hitQuality && this.ball.hitQuality < 0.5) {
+            // Poor contact creates more erratic flight
+            const wobble = 0.001 * (0.5 - this.ball.hitQuality);
+            this.ball.velocity.x += (Math.random() - 0.5) * wobble;
+            this.ball.velocity.y += (Math.random() - 0.5) * wobble * 0.5;
         }
     }
     
